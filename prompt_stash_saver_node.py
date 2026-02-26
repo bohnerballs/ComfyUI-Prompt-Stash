@@ -132,24 +132,42 @@ class PromptStashSaver:
                 workflow = extra_pnginfo.get("workflow")
 
             if workflow:
+                def get_widget_index(node, widget_names):
+                    widget_names = set(widget_names)
+                    widget_index = -1
+                    for input_def in node.get("inputs", []):
+                        if input_def.get("widget"):
+                            widget_index += 1
+                            input_name = input_def.get("name")
+                            widget_name = input_def.get("widget", {}).get("name")
+                            if input_name in widget_names or widget_name in widget_names:
+                                return widget_index
+                    return None
 
                 def apply_stash_changes(node):
-                    if "widgets_values" in node:
-                        # Set use_input_text to False in metadata (index 0 based on INPUT_TYPES order)
-                        use_input_text_index = 0  # First widget in optional inputs
-                        prompt_text_index = 1     # Second non-forceInput widget in optional inputs
+                    if "widgets_values" not in node:
+                        return
 
-                        # Safety check, make sure there are at least 2 elements
-                        if len(node["widgets_values"]) > prompt_text_index:
-                            node["widgets_values"][use_input_text_index] = False  # Force use_input_text to False in metadata
-                            node["widgets_values"][prompt_text_index] = output_text  # Update the prompt text
+                    use_input_text_index = get_widget_index(node, ["use_input_text"])
+                    prompt_text_index = get_widget_index(node, ["prompt_text", "text"])
+
+                    if use_input_text_index is not None and len(node["widgets_values"]) > use_input_text_index:
+                        node["widgets_values"][use_input_text_index] = False
+                    if prompt_text_index is not None and len(node["widgets_values"]) > prompt_text_index:
+                        node["widgets_values"][prompt_text_index] = output_text
 
                 update_node_in_workflow(workflow, unique_id, apply_stash_changes)
 
             if prompt and unique_id is not None:
                 node_id_str = str(unique_id)
                 if node_id_str in prompt:
-                    prompt[node_id_str]['inputs']['use_input_text'] = False
-                    prompt[node_id_str]['inputs']['prompt_text'] = output_text
+                    node_inputs = prompt[node_id_str].get('inputs', {})
+                    use_input_text_key = next((k for k in node_inputs if k == 'use_input_text' or k.endswith('use_input_text')), None)
+                    prompt_text_key = next((k for k in node_inputs if k == 'prompt_text' or k.endswith('prompt_text')), None)
+
+                    if use_input_text_key is not None:
+                        node_inputs[use_input_text_key] = False
+                    if prompt_text_key is not None:
+                        node_inputs[prompt_text_key] = output_text
 
         return (output_text,)
