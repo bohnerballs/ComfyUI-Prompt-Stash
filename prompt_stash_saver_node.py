@@ -2,7 +2,7 @@ import os
 import json
 from server import PromptServer
 import hashlib
-from .data_utils import init_data_file, update_node_in_workflow
+from .data_utils import init_data_file
 
 class PromptStashSaver:
     def __init__(self):
@@ -124,32 +124,14 @@ class PromptStashSaver:
                 "prompt": text
             })
 
-            # Handle both list and dict formats of extra_pnginfo
-            workflow = None
-            if isinstance(extra_pnginfo, list) and len(extra_pnginfo) > 0:
-                workflow = extra_pnginfo[0].get("workflow")
-            elif isinstance(extra_pnginfo, dict):
-                workflow = extra_pnginfo.get("workflow")
-
-            if workflow:
-
-                def apply_stash_changes(node):
-                    if "widgets_values" in node:
-                        # Set use_input_text to False in metadata (index 0 based on INPUT_TYPES order)
-                        use_input_text_index = 0  # First widget in optional inputs
-                        prompt_text_index = 1     # Second non-forceInput widget in optional inputs
-
-                        # Safety check, make sure there are at least 2 elements
-                        if len(node["widgets_values"]) > prompt_text_index:
-                            node["widgets_values"][use_input_text_index] = False  # Force use_input_text to False in metadata
-                            node["widgets_values"][prompt_text_index] = output_text  # Update the prompt text
-
-                update_node_in_workflow(workflow, unique_id, apply_stash_changes)
-
+            
             if prompt and unique_id is not None:
                 node_id_str = str(unique_id)
                 if node_id_str in prompt:
-                    prompt[node_id_str]['inputs']['use_input_text'] = False
-                    prompt[node_id_str]['inputs']['prompt_text'] = output_text
+                       node_inputs = prompt[node_id_str].get('inputs', {})
+                    if 'use_input_text' in node_inputs:
+                        node_inputs['use_input_text'] = False
+                    if 'prompt_text' in node_inputs:
+                        node_inputs['prompt_text'] = output_text
 
         return (output_text,)
